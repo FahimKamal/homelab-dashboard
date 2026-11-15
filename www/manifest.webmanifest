@@ -1,0 +1,9 @@
+{
+  "name": "Fahim's Home Lab",
+  "short_name": "Home Lab",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "icons": [{ "src": "icons/home.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

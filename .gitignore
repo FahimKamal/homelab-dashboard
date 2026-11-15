@@ -1,0 +1,6 @@
+# written by the page while saving
+config/*.tmp
+# your own settings (domain, timezone): never commit
+.env
+__pycache__/
+*.pyc

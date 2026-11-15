@@ -1,0 +1,41 @@
+# Home Lab dashboard: one page with every app + live status + Start/Stop.
+#   https://home.<your domain> (Nginx Proxy Manager host → dashboard:8080), or http://localhost:8088 on the host.
+# Tiles: config/services.json. Your domain: .env (copy .env.example). See README.md.
+# Start/update (from the Linux/WSL shell):  docker compose up -d
+
+services:
+  dashboard:
+    image: python:3.13-alpine              # standard library only: no build, no pip
+    container_name: dashboard
+    restart: unless-stopped
+    command: ["python", "-u", "/app/server.py"]
+    # uid 0 = owner of the Docker socket; gid 1000 = the host user, so it can write config/ (owned by that user).
+    # All capabilities dropped: as root it still can't read or write anything it doesn't own/share a group with.
+    user: "0:1000"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    mem_limit: 64m                         # uses ~15-20 MB
+    pids_limit: 64
+    environment:
+      - TZ=${TZ:-UTC}
+      - PYTHONDONTWRITEBYTECODE=1
+      - DASHBOARD_DOMAIN=${DASHBOARD_DOMAIN:?Set DASHBOARD_DOMAIN in .env (copy .env.example)}
+    volumes:
+      - ./server.py:/app/server.py:ro
+      - ./www:/app/www:ro
+      - ./config:/config
+      # The server only touches containers listed in services.json (and their compose stacks).
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "127.0.0.1:8088:8080"              # local fallback if the proxy is down
+    networks:
+      - npm_network                        # the proxy reaches it as dashboard:8080; it probes the apps the same way
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "2" }
+
+networks:
+  npm_network:
+    external: true

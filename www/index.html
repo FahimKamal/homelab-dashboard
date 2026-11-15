@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Home Lab</title>
+  <link rel="icon" href="icons/home.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/home.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+
+  <header class="top">
+    <div>
+      <p class="hello" id="hello">Hello</p>
+      <h1 id="title">Home Lab</h1>
+    </div>
+    <div class="clock">
+      <span id="time">--:--</span>
+      <span id="date"></span>
+    </div>
+  </header>
+
+  <div class="summary" id="summary" aria-live="polite"></div>
+  <div class="banner" id="banner" hidden></div>
+
+  <main id="groups"></main>
+
+  <footer class="foot">
+    <button class="ghost" id="editBtn" type="button" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>
+      <span>Edit</span>
+    </button>
+    <span class="updated" id="updated"></span>
+  </footer>
+
+  <!-- one dialog, reused for start / stop / add / messages -->
+  <dialog id="dlg">
+    <form method="dialog" id="dlgForm">
+      <div class="dlg-head">
+        <img id="dlgIcon" alt="" hidden>
+        <h2 id="dlgTitle"></h2>
+      </div>
+      <div id="dlgBody"></div>
+      <div class="dlg-actions" id="dlgActions"></div>
+    </form>
+  </dialog>
+</body>
+</html>
