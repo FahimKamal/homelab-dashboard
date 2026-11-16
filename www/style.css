@@ -167,6 +167,21 @@ input {
 }
 input:focus { outline: none; border-color: var(--accent); }
 
+/* ---------- animated background (matrix.js) ----------
+   The canvas sits above the aurora and below everything else. While it runs, cards and loose text get a
+   dark backing so they stay readable over the rain. */
+.matrix { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+.matrix[hidden] { display: none; }
+body.matrix-on .bg { opacity: .5; }
+body.matrix-on .top, body.matrix-on .summary, body.matrix-on section h2, body.matrix-on .updated {
+  text-shadow: 0 1px 2px rgba(11, 16, 32, .95), 0 0 14px rgba(11, 16, 32, .95);
+}
+body.matrix-on .tile { background: linear-gradient(var(--card), var(--card)), rgba(11, 16, 32, .5); }
+body.matrix-on .tile:hover { background: linear-gradient(var(--card-hover), var(--card-hover)), rgba(11, 16, 32, .5); }
+body.matrix-on .tile.add-tile { background: rgba(11, 16, 32, .35); }
+body.matrix-on .pill, body.matrix-on .ghost { background: rgba(20, 26, 48, .75); }
+body.matrix-on .ghost:hover { background: rgba(30, 38, 66, .85); }
+
 /* phones: two compact columns, icon on top */
 @media (max-width: 560px) {
   body { font-size: 14px; }
