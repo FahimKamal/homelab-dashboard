@@ -35,12 +35,56 @@
   <main id="groups"></main>
 
   <footer class="foot">
-    <button class="ghost" id="editBtn" type="button" aria-pressed="false">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>
-      <span>Edit</span>
-    </button>
+    <div class="foot-btns">
+      <button class="ghost" id="editBtn" type="button" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>
+        <span>Edit</span>
+      </button>
+      <button class="ghost" id="bgBtn" type="button" aria-expanded="false" aria-controls="bgPanel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+        <span>Background</span>
+      </button>
+    </div>
     <span class="updated" id="updated"></span>
   </footer>
+
+  <!-- background settings (matrix.js); not modal, so the rain stays visible while you change it -->
+  <div class="bgpanel" id="bgPanel" role="dialog" aria-labelledby="bgTitle" hidden>
+    <div class="bgp-head">
+      <h2 id="bgTitle">Background</h2>
+      <button class="icon-btn" id="bgClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="row"><label for="bgOn">Animated rain</label><input class="switch" type="checkbox" id="bgOn"></div>
+    <fieldset id="bgOpts">
+      <div class="row"><label for="bgMouse">React to mouse and touch</label><input class="switch" type="checkbox" id="bgMouse"></div>
+      <div class="slider">
+        <div class="row"><label for="bgSpeed">Speed</label><output id="bgSpeedV" for="bgSpeed"></output></div>
+        <input type="range" id="bgSpeed" min="0.2" max="3" step="0.1">
+      </div>
+      <div class="slider">
+        <div class="row"><label for="bgBright">Brightness</label><output id="bgBrightV" for="bgBright"></output></div>
+        <input type="range" id="bgBright" min="0.15" max="1" step="0.05">
+      </div>
+      <div class="slider">
+        <div class="row"><label for="bgSize">Glyph size</label><output id="bgSizeV" for="bgSize"></output></div>
+        <input type="range" id="bgSize" min="10" max="28" step="1">
+      </div>
+
+      <p class="bgp-sub">Colors <small>· the rain blends from one to the next</small></p>
+      <div class="swatches" id="bgColors"></div>
+      <div class="presets" id="bgPresets"></div>
+      <div class="slider">
+        <div class="row"><label for="bgShift">Color change speed</label><output id="bgShiftV" for="bgShift"></output></div>
+        <input type="range" id="bgShift" min="0" max="3" step="0.1">
+      </div>
+    </fieldset>
+    <div class="bgp-foot">
+      <small>Saved in this browser</small>
+      <button class="btn" id="bgReset" type="button">Reset</button>
+    </div>
+  </div>
 
   <!-- one dialog, reused for start / stop / add / messages -->
   <dialog id="dlg">

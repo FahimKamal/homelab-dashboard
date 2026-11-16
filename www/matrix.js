@@ -195,8 +195,8 @@
           if (d2 < R2) {                                   // bubble around the pointer
             const d = Math.sqrt(d2) || 1, f = 1 - d / R, f2 = f * f * inf, push = f2 * R * 0.35;
             x += (dx / d) * push; y += (dy / d) * push;     // push outwards (never crosses over, so no tearing)
-            b = Math.min(1, Math.max(b, 0.3 * f * inf) + 0.5 * f2);
-            if (f2 > 0.04) style = css(mix(col, WHITE, Math.min(0.85, f2)));
+            b = Math.min(1, Math.max(b, 0.45 * f * inf) + 0.7 * f2);
+            if (f2 > 0.03) style = css(mix(col, WHITE, Math.min(0.85, f2 * 1.3)));
           }
         }
         if (b < 0.03) continue;
@@ -265,5 +265,109 @@
     resizeTimer = setTimeout(() => { if (raf) onResize(); }, 150);
   });
 
+  // ---------- settings panel ----------
+  const PRESETS = [
+    ['Green', ['#00ff66', '#00b347']],
+    ['Home Lab', ['#818cf8', '#ec4899', '#14b8a6']],
+    ['Ocean', ['#22d3ee', '#3b82f6', '#a78bfa']],
+    ['Sunset', ['#facc15', '#f97316', '#f43f5e']],
+    ['Rainbow', ['#f43f5e', '#facc15', '#22c55e', '#22d3ee', '#a855f7']],
+    ['Ice', ['#ffffff', '#7dd3fc']],
+  ];
+  const RANGES = [                             // [input id, setting, how to show the value, grid changes?]
+    ['bgSpeed', 'speed', (v) => v.toFixed(1) + '×', false],
+    ['bgBright', 'bright', (v) => Math.round(v * 100) + '%', false],
+    ['bgSize', 'size', (v) => v + ' px', true],
+    ['bgShift', 'shift', (v) => (v === 0 ? 'Still' : v.toFixed(1) + '×'), false],
+  ];
+  const $ = (id) => document.getElementById(id);
+  const panel = $('bgPanel'), openBtn = $('bgBtn');
+  function mk(tag, attrs, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+    e.append(...kids);
+    return e;
+  }
+  function randomColor() {                     // a bright colour with a random hue
+    const h = Math.random() * 360, s = 0.9, l = 0.6, a = s * Math.min(l, 1 - l);
+    const f = (n) => {
+      const k = (n + h / 30) % 12;
+      return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))).toString(16).padStart(2, '0');
+    };
+    return '#' + f(0) + f(8) + f(4);
+  }
+
+  function renderColors() {
+    const box = $('bgColors');
+    box.replaceChildren();
+    cfg.colors.forEach((c, k) => {
+      const inp = mk('input', { type: 'color', value: c, 'aria-label': `Color ${k + 1}`, title: 'Change this color' });
+      // 'input' fires while the picker is open: update live, but don't re-render (that would close the picker)
+      inp.addEventListener('input', () => { cfg.colors[k] = inp.value.toLowerCase(); apply(false); markPreset(); });
+      const sw = mk('div', { class: 'sw' }, inp);
+      if (cfg.colors.length > 1) {
+        const x = mk('button', { type: 'button', class: 'sw-x', title: 'Remove this color', 'aria-label': `Remove color ${k + 1}` }, '×');
+        x.addEventListener('click', () => { cfg.colors.splice(k, 1); changed(false); });
+        sw.append(x);
+      }
+      box.append(sw);
+    });
+    if (cfg.colors.length < MAX_COLORS) {
+      const add = mk('button', { type: 'button', class: 'sw-add', title: 'Add a color', 'aria-label': 'Add a color' }, '+');
+      add.addEventListener('click', () => { cfg.colors.push(randomColor()); changed(false); });
+      box.append(add);
+    }
+  }
+
+  function renderPresets() {
+    $('bgPresets').replaceChildren(...PRESETS.map(([name, colors]) => {
+      const chip = mk('i');
+      chip.style.background = colors.length > 1 ? `linear-gradient(90deg, ${colors.join(', ')})` : colors[0];
+      const b = mk('button', { type: 'button', class: 'preset', 'aria-pressed': 'false', 'data-colors': colors.join() }, chip, name);
+      b.addEventListener('click', () => { cfg.colors = colors.slice(); changed(false); });
+      return b;
+    }));
+  }
+  function markPreset() {
+    const now = cfg.colors.join();
+    for (const b of $('bgPresets').children) b.setAttribute('aria-pressed', String(b.dataset.colors === now));
+  }
+
+  function syncPanel() {                       // settings → controls
+    $('bgOn').checked = cfg.on;
+    $('bgMouse').checked = cfg.mouse;
+    $('bgOpts').disabled = !cfg.on;
+    for (const [id, key, fmt] of RANGES) { $(id).value = cfg[key]; $(id + 'V').textContent = fmt(cfg[key]); }
+    renderColors();
+    markPreset();
+  }
+  function changed(rebuild) { apply(rebuild); syncPanel(); }
+
+  function showPanel(open) {
+    panel.hidden = !open;
+    openBtn.setAttribute('aria-expanded', String(open));
+    if (open) { syncPanel(); $('bgOn').focus(); }
+  }
+
+  for (const [id, key, fmt, rebuild] of RANGES) {
+    $(id).addEventListener('input', (e) => {
+      cfg[key] = Number(e.target.value);
+      $(id + 'V').textContent = fmt(cfg[key]);
+      apply(rebuild);
+    });
+  }
+  $('bgOn').addEventListener('change', (e) => { cfg.on = e.target.checked; changed(false); });
+  $('bgMouse').addEventListener('change', (e) => { cfg.mouse = e.target.checked; changed(false); });
+  $('bgReset').addEventListener('click', () => { cfg = Object.assign(clean({}), { on: cfg.on }); changed(true); });
+  openBtn.addEventListener('click', () => showPanel(panel.hidden));
+  $('bgClose').addEventListener('click', () => { showPanel(false); openBtn.focus(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !panel.hidden && !document.querySelector('dialog[open]')) { showPanel(false); openBtn.focus(); }
+  });
+  document.addEventListener('pointerdown', (e) => {            // click anywhere else closes it
+    if (!panel.hidden && !panel.contains(e.target) && !openBtn.contains(e.target)) showPanel(false);
+  });
+
+  renderPresets();
   apply(false);
 })();
