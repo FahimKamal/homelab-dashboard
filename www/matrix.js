@@ -15,7 +15,7 @@
   const MAX_COLORS = 6;
   const DEFAULTS = {
     on: !reduceMotion, mouse: true,
-    speed: 1, bright: 0.7, size: 16, shift: 1,
+    speed: 1, density: 1, bright: 0.7, size: 16, shift: 1,
     colors: ['#22ff88', '#22d3ee', '#818cf8'],
   };
   const GLYPHS = Array.from('ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789ZXCVBNM<>*+=-:.¦');
@@ -31,6 +31,7 @@
       on: typeof s.on === 'boolean' ? s.on : DEFAULTS.on,
       mouse: typeof s.mouse === 'boolean' ? s.mouse : DEFAULTS.mouse,
       speed: num(s.speed, 0.2, 3, DEFAULTS.speed),
+      density: num(s.density, 0.2, 3, DEFAULTS.density),
       bright: num(s.bright, 0.15, 1, DEFAULTS.bright),
       size: Math.round(num(s.size, 10, 28, DEFAULTS.size)),
       shift: num(s.shift, 0, 3, DEFAULTS.shift),
@@ -63,20 +64,42 @@
   let cfg = load();
   let pal = [];
   let W = 0, H = 0, dpr = 1, fs = 16, cols = 0, rows = 0;
-  let bright, glyph, dropY, dropV, dropL, fade, head;
+  let bright, glyph, cellFade, isHead;              // per cell
+  let dropC, dropY, dropV, dropL, dropH, nd = 0;    // per drop: column, y (cells), speed, trail length, head row
   let raf = 0, lastT = 0, resizeTimer = 0;
+  const LIGHT_FADE = 0.9;                           // fade per second of cells lit by the pointer
   const P = { x: -1e4, y: -1e4, px: 0, py: 0, moved: false, inside: false, isMouse: true, touchUntil: 0, inf: 0 };
   const ripples = [];
 
   const rnd = (a, b) => a + Math.random() * (b - a);
   const rg = () => (Math.random() * GLYPHS.length) | 0;
 
-  function newDrop(c, anywhere) {
-    dropV[c] = rnd(7, 20);                    // cells per second at speed 1
-    dropL[c] = rnd(8, 30);                    // trail length in cells
-    fade[c] = dropV[c] / dropL[c];            // brightness lost per second, so the trail is dropL cells long
-    dropY[c] = anywhere ? rnd(-rows, rows) : rnd(-rows * 0.6, 0);
-    head[c] = Math.floor(dropY[c]);
+  function newDrop(k, anywhere) {
+    // Whole multiples of the column count get one drop per column each; the rest land in random columns.
+    const full = Math.floor(nd / cols) * cols;
+    dropC[k] = k < full ? k % cols : (Math.random() * cols) | 0;
+    dropV[k] = rnd(7, 20);                    // cells per second at speed 1
+    dropL[k] = rnd(8, 30);                    // trail length in cells
+    dropY[k] = anywhere ? rnd(-rows, rows) : rnd(-rows * 0.6, 0);
+    dropH[k] = Math.floor(dropY[k]);
+  }
+
+  function unmarkHead(k) {
+    const h = dropH[k];
+    if (h >= 0 && h < rows) isHead[h * cols + dropC[k]] = 0;
+  }
+
+  // Size the drop list to the intensity setting, keeping the drops that are already falling.
+  function setDrops() {
+    const n = Math.max(1, Math.round(cols * cfg.density)), keep = Math.min(n, nd);
+    for (let k = keep; k < nd; k++) unmarkHead(k);
+    const grow = (old) => { const a = new Float32Array(n); if (old) a.set(old.subarray(0, keep)); return a; };
+    const oldC = dropC, oldH = dropH;
+    dropY = grow(dropY); dropV = grow(dropV); dropL = grow(dropL);
+    dropC = new Int32Array(n); dropH = new Int32Array(n);
+    if (oldC) { dropC.set(oldC.subarray(0, keep)); dropH.set(oldH.subarray(0, keep)); }
+    nd = n;
+    for (let k = keep; k < n; k++) newDrop(k, true);
   }
 
   function setSize() {
@@ -98,9 +121,10 @@
     bright = new Float32Array(n);
     glyph = new Uint8Array(n);
     for (let i = 0; i < n; i++) glyph[i] = rg();
-    dropY = new Float32Array(cols); dropV = new Float32Array(cols); dropL = new Float32Array(cols);
-    fade = new Float32Array(cols); head = new Int32Array(cols);
-    for (let c = 0; c < cols; c++) newDrop(c, true);
+    cellFade = new Float32Array(n);
+    isHead = new Uint8Array(n);
+    dropC = dropY = dropV = dropL = dropH = null; nd = 0;
+    setDrops();
     setSize();
     for (let k = 0; k < 40; k++) step(0.05, 0);   // start with rain already on screen
   }
@@ -125,7 +149,7 @@
         const d = Math.hypot(c * fs + fs / 2 - x, r * fs + fs / 2 - y);
         if (d >= rad) continue;
         const v = amt * (1 - d / rad), i = r * cols + c;
-        if (v > bright[i]) { bright[i] = v; if (Math.random() < 0.5) glyph[i] = rg(); }
+        if (v > bright[i]) { bright[i] = v; cellFade[i] = LIGHT_FADE; if (Math.random() < 0.5) glyph[i] = rg(); }
       }
     }
   }
@@ -139,26 +163,30 @@
         const off = Math.abs(Math.hypot(c * fs + fs / 2 - x, r * fs + fs / 2 - y) - rad);
         if (off >= w) continue;
         const v = amt * (1 - off / w), i = r * cols + c;
-        if (v > bright[i]) { bright[i] = v; glyph[i] = rg(); }
+        if (v > bright[i]) { bright[i] = v; cellFade[i] = LIGHT_FADE; glyph[i] = rg(); }
       }
     }
   }
 
   function step(dt, now) {
     const sp = cfg.speed;
-    for (let c = 0; c < cols; c++) {
-      dropY[c] += dropV[c] * sp * dt;
-      const r = Math.floor(dropY[c]);
-      for (let k = head[c] + 1; k <= r; k++) {           // every cell the drop entered this frame
-        if (k >= 0 && k < rows) { const i = k * cols + c; bright[i] = 1; glyph[i] = rg(); }
+    for (let k = 0; k < nd; k++) {
+      const c = dropC[k];
+      dropY[k] += dropV[k] * sp * dt;
+      const r = Math.floor(dropY[k]);
+      if (r !== dropH[k]) {
+        unmarkHead(k);
+        const f = dropV[k] / dropL[k];                     // fade per second, so the trail is dropL cells long
+        for (let j = dropH[k] + 1; j <= r; j++) {          // every cell the drop entered this frame
+          if (j >= 0 && j < rows) { const i = j * cols + c; bright[i] = 1; cellFade[i] = f; glyph[i] = rg(); }
+        }
+        dropH[k] = r;
+        if (r >= 0 && r < rows) isHead[r * cols + c] = 1;
       }
-      head[c] = r;
-      if (dropY[c] - dropL[c] > rows) newDrop(c, false);
+      if (dropY[k] - dropL[k] > rows) { unmarkHead(k); newDrop(k, false); }
     }
-    for (let r = 0, i = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++, i++) {
-        if (bright[i] > 0) { const b = bright[i] - fade[c] * sp * dt; bright[i] = b > 0 ? b : 0; }
-      }
+    for (let i = 0, n = cols * rows; i < n; i++) {
+      if (bright[i] > 0) { const b = bright[i] - cellFade[i] * sp * dt; bright[i] = b > 0 ? b : 0; }
     }
     const flips = (cols * rows * 0.6 * dt) | 0;          // glyphs keep changing a little
     for (let k = 0; k < flips; k++) glyph[(Math.random() * cols * rows) | 0] = rg();
@@ -185,11 +213,12 @@
     for (let c = 0; c < cols; c++) {
       const col = paletteAt(t + c / cols);                 // the whole width spans one colour step
       const colS = css(col), headS = css(mix(col, WHITE, 0.75));
-      const x0 = c * fs + fs / 2, dx = x0 - mx, near = useM && Math.abs(dx) < R, hr = head[c];
+      const x0 = c * fs + fs / 2, dx = x0 - mx, near = useM && Math.abs(dx) < R;
       let cur = colS;
       ctx.fillStyle = colS;
       for (let r = 0, i = c; r < rows; r++, i += cols) {
-        let b = bright[i], x = x0, y = r * fs + fs / 2, style = r === hr ? headS : colS;
+        const hd = isHead[i] === 1;
+        let b = bright[i], x = x0, y = r * fs + fs / 2, style = hd ? headS : colS;
         if (near) {
           const dy = y - my, d2 = dx * dx + dy * dy;
           if (d2 < R2) {                                   // bubble around the pointer
@@ -201,7 +230,7 @@
         }
         if (b < 0.03) continue;
         if (style !== cur) { ctx.fillStyle = style; cur = style; }
-        ctx.globalAlpha = r === hr ? Math.min(1, b * am + 0.25) : b * am;
+        ctx.globalAlpha = hd ? Math.min(1, b * am + 0.25) : b * am;
         ctx.fillText(GLYPHS[glyph[i]], x, y);
       }
     }
@@ -235,12 +264,13 @@
     bright = null;                                         // free the grid
   }
 
-  // Apply cfg to the running animation. rebuild = the grid size changed.
-  function apply(rebuild) {
+  // Apply cfg to the running animation. what: 'grid' = glyph size changed, 'drops' = intensity changed.
+  function apply(what) {
     pal = cfg.colors.map(hex2rgb);
     if (!cfg.on) stop();
     else if (!raf) start();
-    else if (rebuild) build();
+    else if (what === 'grid') build();
+    else if (what === 'drops') setDrops();
     save();
   }
 
@@ -274,10 +304,11 @@
     ['Rainbow', ['#f43f5e', '#facc15', '#22c55e', '#22d3ee', '#a855f7']],
     ['Ice', ['#ffffff', '#7dd3fc']],
   ];
-  const RANGES = [                             // [input id, setting, how to show the value, grid changes?]
+  const RANGES = [                             // [input id, setting, how to show the value, what apply() redoes]
     ['bgSpeed', 'speed', (v) => v.toFixed(1) + '×', false],
+    ['bgDensity', 'density', (v) => Math.round(v * 100) + '%', 'drops'],
     ['bgBright', 'bright', (v) => Math.round(v * 100) + '%', false],
-    ['bgSize', 'size', (v) => v + ' px', true],
+    ['bgSize', 'size', (v) => v + ' px', 'grid'],
     ['bgShift', 'shift', (v) => (v === 0 ? 'Still' : v.toFixed(1) + '×'), false],
   ];
   const $ = (id) => document.getElementById(id);
@@ -349,16 +380,16 @@
     if (open) { syncPanel(); $('bgOn').focus(); }
   }
 
-  for (const [id, key, fmt, rebuild] of RANGES) {
+  for (const [id, key, fmt, what] of RANGES) {
     $(id).addEventListener('input', (e) => {
       cfg[key] = Number(e.target.value);
       $(id + 'V').textContent = fmt(cfg[key]);
-      apply(rebuild);
+      apply(what);
     });
   }
   $('bgOn').addEventListener('change', (e) => { cfg.on = e.target.checked; changed(false); });
   $('bgMouse').addEventListener('change', (e) => { cfg.mouse = e.target.checked; changed(false); });
-  $('bgReset').addEventListener('click', () => { cfg = Object.assign(clean({}), { on: cfg.on }); changed(true); });
+  $('bgReset').addEventListener('click', () => { cfg = Object.assign(clean({}), { on: cfg.on }); changed('grid'); });
   openBtn.addEventListener('click', () => showPanel(panel.hidden));
   $('bgClose').addEventListener('click', () => { showPanel(false); openBtn.focus(); });
   document.addEventListener('keydown', (e) => {

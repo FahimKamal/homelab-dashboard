@@ -102,7 +102,9 @@ Click **Background** at the bottom of the page to change it. Changes apply immed
 |---|---|
 | Animated rain | On/off. When off, the old static background is shown and nothing is animated. |
 | React to mouse and touch | Glyphs near the pointer are pushed aside and lit up, moving the pointer leaves a light trail, and a click or tap sends out a ripple. |
-| Speed, Brightness, Glyph size | How fast it falls, how strongly it shows, how big the characters are. |
+| Speed | How fast it falls. |
+| Intensity | How much rain: 20% is a light drizzle, 100% is one drop per column, 300% is a downpour. |
+| Brightness, Glyph size | How strongly it shows, how big the characters are. |
 | Colors | Up to 6 colours. The rain blends from one to the next in a slow wave across the screen. Click a swatch to change it, **×** to remove it, **+** to add one, or pick a preset. |
 | Color change speed | How fast the colours drift. *Still* keeps them in place. |
 | Reset | Back to the default settings (green, cyan, indigo). |
