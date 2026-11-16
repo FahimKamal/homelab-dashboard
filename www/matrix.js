@@ -68,6 +68,25 @@
   let dropC, dropY, dropV, dropL, dropH, nd = 0;    // per drop: column, y (cells), speed, trail length, head row
   let raf = 0, lastT = 0, resizeTimer = 0;
   const LIGHT_FADE = 0.9;                           // fade per second of cells lit by the pointer
+  const BEAT_S = 1.1;                               // heartbeat of the pointer bubble: ~55 beats per minute
+  let lastPh = 0;
+
+  // 0..1 pulse shaped like a heartbeat: a strong "lub", a softer "dub" just after, then rest.
+  // Each bump rises fast and falls off more slowly.
+  function heartbeat(now) {
+    const ph = (now / 1000 / BEAT_S) % 1;
+    const bump = (c) => {
+      let s = ph - c;
+      s -= Math.round(s);                           // wrap to -0.5..0.5
+      const w = s < 0 ? 0.025 : 0.07;
+      return Math.exp(-(s / w) * (s / w));
+    };
+    return Math.max(bump(0), 0.6 * bump(0.2));
+  }
+  function addRipple(x, y, t, amp, speed, life, w) {
+    ripples.push({ x, y, t, amp, speed, life, w });
+    if (ripples.length > 6) ripples.shift();
+  }
   const P = { x: -1e4, y: -1e4, px: 0, py: 0, moved: false, inside: false, isMouse: true, touchUntil: 0, inf: 0 };
   const ripples = [];
 
@@ -194,13 +213,19 @@
     if (!now || !cfg.mouse) return;
     if (P.moved) {                                         // light trail along the pointer's path
       const d = Math.hypot(P.x - P.px, P.y - P.py), n = Math.min(24, Math.ceil(d / fs));
-      for (let k = 1; k <= n; k++) light(P.px + (P.x - P.px) * k / n, P.py + (P.y - P.py) * k / n, fs * 2.2, 0.85);
+      for (let k = 1; k <= n; k++) light(P.px + (P.x - P.px) * k / n, P.py + (P.y - P.py) * k / n, fs * 2, 0.6);
       P.px = P.x; P.py = P.y; P.moved = false;
     }
+    const ph = (now / 1000 / BEAT_S) % 1;                  // each heartbeat sends a faint ring outwards
+    if (P.inf > 0.3 && P.x > -1000) {
+      if (ph < lastPh) addRipple(P.x, P.y, now, 0.28 * P.inf, 230, 0.8, 1.2);                     // lub
+      else if (lastPh < 0.2 && ph >= 0.2) addRipple(P.x, P.y, now, 0.16 * P.inf, 230, 0.7, 1.2);  // dub
+    }
+    lastPh = ph;
     for (let k = ripples.length - 1; k >= 0; k--) {
-      const age = (now - ripples[k].t) / 1000;
-      if (age > 1.1) { ripples.splice(k, 1); continue; }
-      ring(ripples[k].x, ripples[k].y, age * 520, fs * 1.6, 0.9 * (1 - age / 1.1));
+      const rp = ripples[k], age = (now - rp.t) / 1000;
+      if (age > rp.life) { ripples.splice(k, 1); continue; }
+      ring(rp.x, rp.y, age * rp.speed, fs * rp.w, rp.amp * (1 - age / rp.life));
     }
   }
 
@@ -208,7 +233,9 @@
   function draw(now) {
     ctx.clearRect(0, 0, W, H);
     const t = cfg.shift * 0.12 * now / 1000;              // colour steps per second
-    const R = Math.max(110, fs * 8), R2 = R * R, inf = P.inf, useM = inf > 0.01;
+    const beat = P.inf > 0.01 ? heartbeat(now) : 0;
+    const R = Math.max(100, fs * 7) * (1 + 0.1 * beat), R2 = R * R, inf = P.inf, useM = inf > 0.01;
+    const pushK = 0.08 + 0.1 * beat, lift = 0.18 + 0.25 * beat, tint = 0.3 + 0.4 * beat;
     const mx = P.x, my = P.y, am = cfg.bright;
     for (let c = 0; c < cols; c++) {
       const col = paletteAt(t + c / cols);                 // the whole width spans one colour step
@@ -221,11 +248,11 @@
         let b = bright[i], x = x0, y = r * fs + fs / 2, style = hd ? headS : colS;
         if (near) {
           const dy = y - my, d2 = dx * dx + dy * dy;
-          if (d2 < R2) {                                   // bubble around the pointer
-            const d = Math.sqrt(d2) || 1, f = 1 - d / R, f2 = f * f * inf, push = f2 * R * 0.35;
+          if (d2 < R2) {                                   // soft bubble around the pointer, swelling with each beat
+            const d = Math.sqrt(d2) || 1, f = 1 - d / R, f2 = f * f * inf, push = f2 * R * pushK;
             x += (dx / d) * push; y += (dy / d) * push;     // push outwards (never crosses over, so no tearing)
-            b = Math.min(1, Math.max(b, 0.45 * f * inf) + 0.7 * f2);
-            if (f2 > 0.03) style = css(mix(col, WHITE, Math.min(0.85, f2 * 1.3)));
+            b = Math.min(1, Math.max(b, (0.12 + 0.16 * beat) * f * inf) + lift * f2);
+            if (f2 > 0.05) style = css(mix(col, WHITE, Math.min(0.55, f2 * tint)));
           }
         }
         if (b < 0.03) continue;
@@ -285,8 +312,7 @@
   window.addEventListener('pointerdown', (e) => {
     track(e);
     if (!raf || !cfg.mouse) return;
-    ripples.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-    if (ripples.length > 4) ripples.shift();
+    addRipple(e.clientX, e.clientY, performance.now(), 0.9, 520, 1.1, 1.6);
   }, { passive: true });
   window.addEventListener('pointerout', (e) => { if (!e.relatedTarget) { P.inside = false; P.x = P.y = -1e4; } });
   window.addEventListener('blur', () => { P.inside = false; });
