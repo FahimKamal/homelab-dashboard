@@ -17,9 +17,11 @@ It is a single tiny container (`python:3.13-alpine` running one standard-library
   starting or stopping, and 8mb.local is asked whether a job is still running before it is stopped.
 - **Easy to extend.** Add a tile in `config/services.json`, or add a plain link from the page (**Edit → Add link**).
 - **Phone friendly.** Two-column layout, large tap targets, "Add to Home screen" support.
-- **Animated background.** Falling glyph "rain" that blends between colours you pick and reacts to the mouse
-  (or touch). Can be turned off from the page. See [Background](#background).
-- **Light.** Status refreshes every 10 s only while the page is visible. Nothing runs in the background.
+- **Animated background.** Falling glyph "rain" that blends between colours you pick, with adjustable speed,
+  intensity, brightness and size. A soft glow follows the mouse (or your finger) and pulses like a heartbeat; clicks
+  send ripples. Can be turned off from the page. See [Background](#background).
+- **Light.** Status refreshes every 10 s only while the page is visible. The animation runs only in the browser and
+  pauses when the tab is hidden.
 
 | Phone | Start an on-demand tool | Stop dialog | Add a link |
 |---|---|---|---|
@@ -96,12 +98,15 @@ with `"custom": true`, and can be removed again in Edit mode.
 
 ## Background
 The page background is a canvas animation (`www/matrix.js`, no libraries): columns of glyphs falling like rain.
-Click **Background** at the bottom of the page to change it. Changes apply immediately.
+Click **Background** at the bottom of the page to change it. Changes apply immediately, and the panel doesn't cover
+the page, so you can watch the rain while you adjust it.
+
+![Background settings](docs/screenshots/background.png)
 
 | Setting | What it does |
 |---|---|
 | Animated rain | On/off. When off, the old static background is shown and nothing is animated. |
-| React to mouse and touch | Glyphs near the pointer are pushed aside and lit up, moving the pointer leaves a light trail, and a click or tap sends out a ripple. |
+| React to mouse and touch | A soft glow of glyphs follows the pointer and **pulses like a heartbeat** (~55 beats per minute: a strong "lub", a softer "dub"); each beat swells it a little and sends a faint ring outwards. Moving the pointer leaves a light trail, and a click or tap sends out a bigger ripple. |
 | Speed | How fast it falls. |
 | Intensity | How much rain: 20% is a light drizzle, 100% is one drop per column, 300% is a downpour. |
 | Brightness, Glyph size | How strongly it shows, how big the characters are. |
@@ -112,6 +117,10 @@ Click **Background** at the bottom of the page to change it. Changes apply immed
 - The settings are saved **in the browser** (localStorage), so a phone and a PC can each have their own.
 - It runs at up to 60 fps on a PC and 30 fps on phones, and stops while the tab is hidden. With the system setting
   "reduce motion" it starts switched off.
+- **Resource use** (measured in Chrome at 1920×1080 on a desktop with a 32-thread CPU and an RTX 4070 Ti, mouse
+  hovering): default settings ≈ ¼ of one CPU core (under 1% of the whole CPU), ≈ 5% GPU, ~15 MB GPU memory and a few
+  MB of RAM; 300% intensity ≈ ½ of one core. Larger screens or display scaling cost more, roughly in proportion to the
+  number of pixels. Nothing extra runs on the server: the container stays at ~20 MB of RAM.
 - To get rid of it completely, remove the `matrix.js` script tag and the `<canvas>` from `www/index.html`.
 
 ## Updating
