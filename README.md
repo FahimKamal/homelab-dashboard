@@ -17,6 +17,8 @@ It is a single tiny container (`python:3.13-alpine` running one standard-library
   starting or stopping, and 8mb.local is asked whether a job is still running before it is stopped.
 - **Easy to extend.** Add a tile in `config/services.json`, or add a plain link from the page (**Edit → Add link**).
 - **Phone friendly.** Two-column layout, large tap targets, "Add to Home screen" support.
+- **Animated background.** Falling glyph "rain" that blends between colours you pick and reacts to the mouse
+  (or touch). Can be turned off from the page. See [Background](#background).
 - **Light.** Status refreshes every 10 s only while the page is visible. Nothing runs in the background.
 
 | Phone | Start an on-demand tool | Stop dialog | Add a link |
@@ -92,6 +94,26 @@ using the last good version.
 **Quick links** (no status, no Start/Stop): click **Edit → Add link** on the page. They are saved into `services.json`
 with `"custom": true`, and can be removed again in Edit mode.
 
+## Background
+The page background is a canvas animation (`www/matrix.js`, no libraries): columns of glyphs falling like rain.
+Click **Background** at the bottom of the page to change it. Changes apply immediately.
+
+| Setting | What it does |
+|---|---|
+| Animated rain | On/off. When off, the old static background is shown and nothing is animated. |
+| React to mouse and touch | Glyphs near the pointer are pushed aside and lit up, moving the pointer leaves a light trail, and a click or tap sends out a ripple. |
+| Speed | How fast it falls. |
+| Intensity | How much rain: 20% is a light drizzle, 100% is one drop per column, 300% is a downpour. |
+| Brightness, Glyph size | How strongly it shows, how big the characters are. |
+| Colors | Up to 6 colours. The rain blends from one to the next in a slow wave across the screen. Click a swatch to change it, **×** to remove it, **+** to add one, or pick a preset. |
+| Color change speed | How fast the colours drift. *Still* keeps them in place. |
+| Reset | Back to the default settings (green, cyan, indigo). |
+
+- The settings are saved **in the browser** (localStorage), so a phone and a PC can each have their own.
+- It runs at up to 60 fps on a PC and 30 fps on phones, and stops while the tab is hidden. With the system setting
+  "reduce motion" it starts switched off.
+- To get rid of it completely, remove the `matrix.js` script tag and the `<canvas>` from `www/index.html`.
+
 ## Updating
 | Changed | Do |
 |---|---|
@@ -141,7 +163,8 @@ browser ──https──▶ Nginx Proxy Manager ──▶ dashboard:8080 (serve
 ```
 - `server.py`: `http.server` plus the Docker Engine API over `/var/run/docker.sock`. Status results are cached for
   2.5 s, so several open devices share one Docker query.
-- `www/`: `index.html`, `style.css`, `app.js` (plain JS, no libraries) and `icons/`.
+- `www/`: `index.html`, `style.css`, `app.js` (plain JS, no libraries), `matrix.js` (the animated background
+  and its settings panel) and `icons/`.
 - `config/services.json`: the tiles. It is re-read whenever it changes.
 
 ## Troubleshooting
