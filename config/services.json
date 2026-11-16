@@ -43,6 +43,16 @@
       "stopWarn": "Git push/pull and LFS stop working until you start it again. The database gets a clean shutdown."
     },
     {
+      "name": "Vaultwarden",
+      "group": "Apps",
+      "description": "Passwords (Bitwarden apps & extension)",
+      "url": "https://vault.{domain}",
+      "icon": "vaultwarden.svg",
+      "container": "vaultwarden",
+      "check": "http://vaultwarden:80/alive",
+      "stopWarn": "The Bitwarden apps and browser extension can't sync or save new logins until you start it again. Logins already synced still fill from each device's offline copy."
+    },
+    {
       "name": "8mb.local",
       "group": "Tools · on demand",
       "description": "Shrink videos (GPU, AV1)",
