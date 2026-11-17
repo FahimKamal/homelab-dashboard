@@ -53,6 +53,16 @@
       "stopWarn": "The Bitwarden apps and browser extension can't sync or save new logins until you start it again. Logins already synced still fill from each device's offline copy."
     },
     {
+      "name": "Ente Auth",
+      "group": "Apps",
+      "description": "2FA codes (Ente Auth apps)",
+      "url": "https://auth.{domain}",
+      "icon": "ente-auth.svg",
+      "container": "ente_museum",
+      "check": "http://ente_museum:8080/ping",
+      "stopWarn": "The Ente Auth apps can't sync new or changed codes until you start it again. Codes already on each device keep working offline."
+    },
+    {
       "name": "8mb.local",
       "group": "Tools · on demand",
       "description": "Shrink videos (GPU, AV1)",
