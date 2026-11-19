@@ -92,6 +92,28 @@
       "warn": "Its work area (E:\\DockerData\\imgcompress) is cleared 48 hours after the last activity. Download your results from the page."
     },
     {
+      "name": "FishSpeech",
+      "group": "Tools · on demand",
+      "description": "Text-to-speech test: Fish Audio S2 Pro (GPU)",
+      "url": "http://localhost:8008",
+      "icon": "fishspeech.svg",
+      "container": "fishspeech",
+      "check": "http://fishspeech:8000/health",
+      "ondemand": true,
+      "warn": "Uses the GPU: never together with Chatterbox (12 GB VRAM). Check nvidia-smi first: Immich ML, Jellyfin and big desktop apps (Unreal) also use VRAM. Only reachable on this PC (localhost). Testing only: Fish Audio Research License (non-commercial)."
+    },
+    {
+      "name": "Chatterbox",
+      "group": "Tools · on demand",
+      "description": "Text-to-speech test: Chatterbox Turbo (GPU)",
+      "url": "http://localhost:8004",
+      "icon": "chatterbox.svg",
+      "container": "chatterbox",
+      "check": "http://chatterbox:8004/",
+      "ondemand": true,
+      "warn": "Uses the GPU: never together with FishSpeech (12 GB VRAM). Check nvidia-smi first: Immich ML, Jellyfin and big desktop apps (Unreal) also use VRAM. Only reachable on this PC (localhost). Testing only: MIT licence."
+    },
+    {
       "name": "Proxy Manager",
       "group": "Admin",
       "description": "Nginx Proxy Manager: hosts & certificates",
