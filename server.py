@@ -47,14 +47,20 @@ class _DockerConn(http.client.HTTPConnection):
         self.sock = s
 
 
-def docker(method, path, timeout=10):
+def docker(method, path, timeout=10, body=None):
     c = _DockerConn(timeout)
     try:
-        c.request(method, path)
+        if body is None:
+            c.request(method, path)
+        else:
+            c.request(method, path, json.dumps(body), {'Content-Type': 'application/json'})
         r = c.getresponse()
         body = r.read()
         if body and (r.getheader('Content-Type') or '').startswith('application/json'):
-            body = json.loads(body)
+            try:
+                body = json.loads(body)
+            except ValueError:                  # streamed answers (image pull) are many JSON lines: keep raw
+                pass
         return r.status, body
     finally:
         c.close()
@@ -210,13 +216,108 @@ def busy_count(s):
         c.close()
 
 
-def act(s, action, force=False):
+# ---------- "update": true → Start = docker compose pull + up -d ----------
+# Recreating a container from a new image can't be done safely with plain API calls (the old image's built-in
+# settings would be copied onto the new one), so a short-lived helper container runs the real compose CLI in
+# the stack's folder, exactly like `docker compose pull && docker compose up -d` from the shell.
+UPDATER_IMAGE = os.environ.get('UPDATER_IMAGE', 'docker:29.10.0-cli')
+_updating = set()
+_upd_lock = threading.Lock()
+
+
+def _pull_image(ref):
+    repo, _, tag = ref.rpartition(':')
+    code, body = docker('POST', f'/images/create?fromImage={urllib.parse.quote(repo)}&tag={urllib.parse.quote(tag)}',
+                        timeout=600)
+    if code != 200 or b'"error' in (body if isinstance(body, bytes) else json.dumps(body).encode()):
+        raise RuntimeError(f'pulling {ref} failed: {code}')
+
+
+def _run_update(s, main):
+    labels = main.get('Labels') or {}
+    proj = labels['com.docker.compose.project']
+    wd = labels['com.docker.compose.project.working_dir']
+    files = labels['com.docker.compose.project.config_files'].split(',')
+    name = f'dashboard-update-{slug(proj)}'
+    args = ['--ansi', 'never', '--progress', 'plain', '-p', proj] + [a for f in files for a in ('-f', f)]
+    # Values go in as "$@" (no shell parsing of them). A failed pull (offline) still starts the image already there.
+    script = ('docker compose "$@" pull -q || echo "update check failed: starting the version already here"; '
+              'exec docker compose "$@" up -d')
+    ok = False
+    try:
+        docker('DELETE', f'/containers/{name}?force=1')               # leftover from an interrupted run
+        code, _ = docker('GET', f'/images/{urllib.parse.quote(UPDATER_IMAGE, safe="")}/json')
+        if code == 404:
+            _pull_image(UPDATER_IMAGE)
+        spec = {
+            'Image': UPDATER_IMAGE, 'Cmd': ['sh', '-c', script, 'sh'] + args, 'WorkingDir': wd, 'Tty': True,
+            'Labels': {'home-dashboard.helper': 'update'},
+            'HostConfig': {
+                'Binds': [f'{wd}:{wd}:ro', '/var/run/docker.sock:/var/run/docker.sock'],
+                'NetworkMode': 'none',          # it only talks to the socket; the engine does the downloading
+                'CapDrop': ['ALL'], 'SecurityOpt': ['no-new-privileges:true'],
+                'Memory': 256 * 1024 * 1024, 'PidsLimit': 64,
+            },
+        }
+        code, body = docker('POST', f'/containers/create?name={name}', body=spec)
+        if code != 201:
+            raise RuntimeError(f'creating the helper failed: {code} {body}')
+        cid = body['Id']
+        log(f'update {proj}: pulling + recreating (helper {name})')
+        code, _ = docker('POST', f'/containers/{cid}/start')
+        if code not in (204, 304):
+            raise RuntimeError(f'starting the helper failed: {code}')
+        code, res = docker('POST', f'/containers/{cid}/wait', timeout=900)
+        _, out = docker('GET', f'/containers/{cid}/logs?stdout=1&stderr=1&tail=20')
+        text = out.decode('utf-8', 'replace') if isinstance(out, bytes) else str(out)
+        for line in text.replace('\r', '\n').splitlines():
+            if line.strip():
+                log(f'update {proj}: {line.strip()}')
+        ok = code == 200 and isinstance(res, dict) and res.get('StatusCode') == 0
+        docker('DELETE', f'/containers/{cid}?force=1')
+    except Exception as e:                                              # noqa: BLE001 (never let the thread die silently)
+        log(f'update {proj}: {e}')
+    finally:
+        with _upd_lock:
+            _updating.discard(proj)
+    if not ok:
+        log(f'update {proj}: failed, starting the existing containers instead')
+        try:
+            act(s, 'start', update=False)
+        except Exception as e:                                          # noqa: BLE001
+            log(f'update {proj}: plain start failed too: {e}')
+    _status_cache['t'] = 0
+
+
+def start_with_update(s, main):
+    labels = main.get('Labels') or {}
+    need = ('com.docker.compose.project', 'com.docker.compose.project.working_dir',
+            'com.docker.compose.project.config_files')
+    if not all(labels.get(k) for k in need):
+        return None                                                     # not a compose container: plain start
+    wd = labels['com.docker.compose.project.working_dir'].rstrip('/') + '/'
+    if not all(f.startswith(wd) for f in labels['com.docker.compose.project.config_files'].split(',')):
+        return None                                                     # compose file outside the folder we mount
+    proj = labels['com.docker.compose.project']
+    with _upd_lock:
+        if proj in _updating:
+            return 200, {'ok': True, 'updating': True}
+        _updating.add(proj)
+    threading.Thread(target=_run_update, args=(s, main), daemon=True).start()
+    return 200, {'ok': True, 'updating': True}
+
+
+def act(s, action, force=False, update=True):
     conts = all_containers()
     main = next((c for c in conts if cname(c).lower() == s['container'].lower()), None)
     if not main:
         return 404, {'error': f"Container '{s['container']}' doesn't exist yet. "
                               f"Create it once from Ubuntu with: docker compose up -d (in its stack folder)."}
     members = stack_members(main, conts)
+    if action == 'start' and update and s.get('update'):
+        r = start_with_update(s, main)
+        if r:
+            return r
     if action == 'start':
         # dependencies (databases, redis) first, the app itself last
         for m in members:
@@ -306,7 +407,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/services':
                 data, err = load_config()
                 pub = ('id', 'name', 'url', 'icon', 'group', 'description', 'ondemand', 'custom', 'warn',
-                       'container', 'stopWarn', 'nostop')
+                       'container', 'stopWarn', 'nostop', 'update')
                 items = [dict({k: s[k] for k in pub if k in s}, managed=bool(s.get('container')))
                          for s in data.get('services', [])]
                 for it in items:

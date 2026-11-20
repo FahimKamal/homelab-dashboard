@@ -87,6 +87,7 @@ Bookmark `https://home.<your domain>` on every device. On a phone: browser menu 
 | `check` | An address *inside* `npm_network` (usually the proxy's target). The tile turns green once it answers. |
 | `ondemand` | `true` = normally off: shown grey, not red, when stopped. |
 | `nostop` | `true` = no Stop button for this tile. |
+| `update` | `true` = Start first pulls the newest image and recreates the stack if it changed (`docker compose pull` + `up -d`). For apps that must stay current (e.g. MeTube, whose yt-dlp breaks when sites change). If the pull fails (offline), it starts the version already there; if the helper itself fails, it falls back to a plain start. |
 | `warn` / `stopWarn` | Text shown in the Start / Stop dialog. |
 | `busy` | `{ "url": ..., "fields": [...] }`: asked before Stop, and the job counts in those fields are added up. |
 
@@ -137,7 +138,11 @@ git add -A && git commit -m "what changed" && git push
 ## Security
 **How the dashboard protects itself**
 - **Docker socket.** It is mounted, which is powerful, but `server.py` only touches containers listed in
-  `services.json` (and their compose projects). It can't create, delete or exec into anything.
+  `services.json` (and their compose projects). It can't exec into anything, and it creates exactly one kind of
+  container: for tiles with `"update": true`, Start runs a short-lived helper (`docker:<version>-cli`, pinned in
+  `server.py` as `UPDATER_IMAGE`) that does `docker compose pull` + `up -d` in that app's own stack folder (read-only,
+  taken from the container's compose labels, no network, all capabilities dropped) and is removed afterwards.
+  Values are passed as arguments, never through a shell string.
 - **No cross-site requests.** Start/Stop and link changes need a custom request header. Other websites
   can't send that from your browser, because the server never allows cross-origin requests.
 - **Locked-down container.** All Linux capabilities are dropped, `no-new-privileges` is set, the root filesystem is
@@ -168,6 +173,7 @@ browser ──https──▶ Nginx Proxy Manager ──▶ dashboard:8080 (serve
                                                ├─ GET  /api/services    tiles from config/services.json
                                                ├─ GET  /api/status      Docker state + HTTP "ready" probe of each app
                                                ├─ POST /api/start|stop  the listed container's compose project
+                                               │                        ("update": true → helper: compose pull + up -d)
                                                └─ POST/DELETE /api/links  quick links (custom: true)
 ```
 - `server.py`: `http.server` plus the Docker Engine API over `/var/run/docker.sock`. Status results are cached for

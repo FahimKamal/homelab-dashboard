@@ -7,6 +7,7 @@
     "container: the container_name. Adds the live status dot plus Start/Stop buttons (they act on the whole compose stack).",
     "check: an address inside npm_network (usually the NPM target) the dashboard tries, to know when the app is really ready.",
     "ondemand: true = normally off: shown grey instead of red when stopped. nostop: true = hide the Stop button.",
+    "update: true = Start first pulls the newest image and recreates the stack (docker compose pull + up -d), e.g. for apps that must stay current like MeTube/yt-dlp. Offline: starts the version already there.",
     "warn: text shown in the Start dialog. stopWarn: text shown in the Stop dialog. busy: where to ask if jobs are running before Stop.",
     "Entries with custom: true were added from the page and can be removed there (Edit button)."
   ],
@@ -100,7 +101,8 @@
       "container": "metube",
       "check": "http://metube:8081/",
       "ondemand": true,
-      "warn": "Finished files go to the PC's Downloads\\MeTube folder (also when you start a download from the phone; tap a finished item to get it on this device). No login: every tailnet device can use it. The Desktop shortcut 'Start metube' also updates yt-dlp first; this button doesn't."
+      "warn": "Start checks for a newer version first (newest yt-dlp), so it can take a minute when there is one. Finished files go to the PC's Downloads\\MeTube folder (also when you start a download from the phone; tap a finished item to get it on this device). No login: every tailnet device can use it.",
+      "update": true
     },
     {
       "name": "FishSpeech",

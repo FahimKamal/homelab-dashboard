@@ -253,7 +253,9 @@ function progressDialog(s) {
         [closeBtn(), openBtn(s)]);
     }
     showDialog(s, `Starting ${s.name}…`,
-      [spinner(`Waiting for ${s.name} to answer. This usually takes a few seconds.`), s.warn ? el('p', { class: 'note' }, s.warn) : null],
+      [spinner(s.update
+        ? `Checking for a newer version of ${s.name} first, then starting it. If there is one, downloading it can take a minute or two.`
+        : `Waiting for ${s.name} to answer. This usually takes a few seconds.`), s.warn ? el('p', { class: 'note' }, s.warn) : null],
       [closeBtn('Hide')]);
   };
   dlgWatch = tick;
