@@ -92,6 +92,17 @@
       "warn": "Its work area (E:\\DockerData\\imgcompress) is cleared 48 hours after the last activity. Download your results from the page."
     },
     {
+      "name": "MeTube",
+      "group": "Tools · on demand",
+      "description": "Download videos & audio (yt-dlp)",
+      "url": "http://localhost:8081",
+      "icon": "metube.svg",
+      "container": "metube",
+      "check": "http://metube:8081/",
+      "ondemand": true,
+      "warn": "Finished files go to the Windows Downloads\\MeTube folder. Only reachable on this PC (localhost). The Desktop shortcut 'Start metube' also updates yt-dlp first; this button doesn't."
+    },
+    {
       "name": "FishSpeech",
       "group": "Tools · on demand",
       "description": "Text-to-speech test: Fish Audio S2 Pro (GPU)",
