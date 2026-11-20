@@ -95,12 +95,12 @@
       "name": "MeTube",
       "group": "Tools · on demand",
       "description": "Download videos & audio (yt-dlp)",
-      "url": "http://localhost:8081",
+      "url": "https://metube.{domain}",
       "icon": "metube.svg",
       "container": "metube",
       "check": "http://metube:8081/",
       "ondemand": true,
-      "warn": "Finished files go to the Windows Downloads\\MeTube folder. Only reachable on this PC (localhost). The Desktop shortcut 'Start metube' also updates yt-dlp first; this button doesn't."
+      "warn": "Finished files go to the PC's Downloads\\MeTube folder (also when you start a download from the phone; tap a finished item to get it on this device). No login: every tailnet device can use it. The Desktop shortcut 'Start metube' also updates yt-dlp first; this button doesn't."
     },
     {
       "name": "FishSpeech",
